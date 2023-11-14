@@ -23,7 +23,7 @@ func TestCopyFileRange(t *testing.T) {
 	offnils := []bool{false, true}
 	for _, roffnil := range offnils {
 		for _, woffnil := range offnils {
-			testCopyFileRange(64, 32, 128, roffnil, woffnil, t)
+			testCopyFileRange(64, 32, 128, roffnil, woffnil, false, t)
 		}
 	}
 
@@ -31,17 +31,18 @@ func TestCopyFileRange(t *testing.T) {
 	offsets := []int64{0, 32, 64, pageSize - 1, pageSize, pageSize + 1}
 	for _, srcOffset := range offsets {
 		for _, dstOffset := range offsets {
-			testCopyFileRange(srcOffset, dstOffset, 128, true, true, t)
+			testCopyFileRange(srcOffset, dstOffset, 128, true, true, false, t)
+			testCopyFileRange(srcOffset, dstOffset, 128, true, true, true, t)
 		}
 	}
 
 	sizes := []int{17, int(pageSize) - 1, int(pageSize), int(pageSize) + 1, maxCopyFileRangeRound - 1, maxCopyFileRangeRound, maxCopyFileRangeRound + 1}
 	for _, size := range sizes {
-		testCopyFileRange(pageSize+64, pageSize+128, size, true, true, t)
+		testCopyFileRange(pageSize+64, pageSize+128, size, true, true, false, t)
 	}
 }
 
-func testCopyFileRange(srcOffset, dstOffset int64, size int, roffnil, woffnil bool, t *testing.T) {
+func testCopyFileRange(srcOffset, dstOffset int64, size int, roffnil, woffnil, mmap bool, t *testing.T) {
 	t.Logf("start test srcOffset:%d, dstOffset:%d, size:%d, roffnil:%t, woffnil:%t", srcOffset, dstOffset, size, roffnil, woffnil)
 	srcName := "srcfile"
 	dstName := "dstfile"
@@ -102,11 +103,20 @@ func testCopyFileRange(srcOffset, dstOffset int64, size int, roffnil, woffnil bo
 			woff = nil
 			dstFile.Seek(dstOffset, io.SeekCurrent)
 		}
-		n, err := CopyFileRange(int(srcFile.Fd()), roff, int(dstFile.Fd()), woff, size, 0)
-		if err != nil {
-			t.Error(err)
-		} else if n != size {
-			t.Error(n)
+		if mmap {
+			n, err := copyFileRange(int(srcFile.Fd()), roff, int(dstFile.Fd()), woff, size, 0)
+			if err != nil {
+				t.Error(err)
+			} else if n != size {
+				t.Error(n)
+			}
+		} else {
+			n, err := CopyFileRange(int(srcFile.Fd()), roff, int(dstFile.Fd()), woff, size, 0)
+			if err != nil {
+				t.Error(err)
+			} else if n != size {
+				t.Error(n)
+			}
 		}
 		dstFile.Sync()
 	}
